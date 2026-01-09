@@ -1,9 +1,0 @@
-{
-    "vol_size": 128,
-    "target_porosity": 0.0003,
-    "actual_porosity": 0.0010457038879394531,
-    "n_particles": 5832,
-    "n_gap_regions": 2152,
-    "blur_mean": 1.0,
-    "blur_std": 0.5
-}
