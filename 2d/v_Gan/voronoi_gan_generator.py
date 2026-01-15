@@ -11,6 +11,7 @@ from scipy import stats
 import warnings
 import os
 from tqdm import tqdm
+from scipy.special import gamma
 
 warnings.filterwarnings('ignore')
 
@@ -207,7 +208,7 @@ class VoronoiParticleGenerator:
             diameters = np.random.gamma(k, theta, n_particles)
         elif distribution == 'weibull':
             k = 2.5
-            lambda_ = mean_diameter / (np.gamma(1 + 1 / k))
+            lambda_ = mean_diameter / (gamma(1 + 1 / k))
             diameters = lambda_ * np.random.weibull(k, n_particles)
         else:
             diameters = np.random.normal(mean_diameter, mean_diameter * std_ratio, n_particles)
