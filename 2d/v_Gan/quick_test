@@ -1,0 +1,163 @@
+"""
+Voronoi-GAN Quick Test Script
+Functionality: Generate and visualize porous media samples with different parameters
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from voronoi_gan_generator import PorousMediaGenerator
+
+
+def test_voronoi_generation():
+    """Test basic Voronoi generation functionality"""
+    print("=" * 60)
+    print("Test 1: Basic Voronoi Porous Media Generation")
+    print("=" * 60)
+
+    generator = PorousMediaGenerator(img_size=256)
+
+    # Test different parameter combinations
+    test_cases = [
+        {'n_particles': 1000, 'avg_diameter': 6, 'name': 'Low Density'},
+        {'n_particles': 2000, 'avg_diameter': 6, 'name': 'Medium Density'},
+        {'n_particles': 3000, 'avg_diameter': 6, 'name': 'High Density'},
+        {'n_particles': 2000, 'avg_diameter': 4, 'name': 'Small Particles'},
+        {'n_particles': 2000, 'avg_diameter': 8, 'name': 'Large Particles'},
+    ]
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    axes = axes.flatten()
+
+    for idx, params in enumerate(test_cases):
+        print(f"\nGenerating sample {idx + 1}: {params['name']}")
+        print(f"  Parameters: N={params['n_particles']}, D={params['avg_diameter']}px")
+
+        img, porosity = generator.generate(
+            n_particles=params['n_particles'],
+            avg_diameter=params['avg_diameter'],
+            use_gan=False
+        )
+
+        print(f"  Actual porosity: {porosity:.2%}")
+
+        axes[idx].imshow(img, cmap='gray')
+        axes[idx].set_title(
+            f"{params['name']}\n"
+            f"N={params['n_particles']}, D={params['avg_diameter']}px\n"
+            f"Porosity: {porosity:.1%}",
+            fontsize=9
+        )
+        axes[idx].axis('off')
+
+    # Hide extra subplot
+    if len(test_cases) < len(axes):
+        axes[-1].axis('off')
+
+    plt.suptitle('Voronoi Porous Media Generation Test',
+                 fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig('test_voronoi_samples.png', dpi=150, bbox_inches='tight')
+    print("\n✓ Results saved: test_voronoi_samples.png")
+    plt.show()
+
+
+def test_particle_size_distribution():
+    """Test different particle size distributions"""
+    print("\n" + "=" * 60)
+    print("Test 2: Particle Size Distribution Effects")
+    print("=" * 60)
+
+    generator = PorousMediaGenerator(img_size=256)
+
+    distributions = ['lognormal', 'gamma', 'weibull', 'normal']
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+    axes = axes.flatten()
+
+    for idx, dist in enumerate(distributions):
+        print(f"\nTesting distribution: {dist}")
+
+        img, porosity = generator.generate(
+            n_particles=2000,
+            avg_diameter=6,
+            use_gan=False,
+            distribution=dist
+        )
+
+        print(f"  Porosity: {porosity:.2%}")
+
+        axes[idx].imshow(img, cmap='gray')
+        axes[idx].set_title(
+            f'{dist.capitalize()} Distribution\n'
+            f'Porosity: {porosity:.1%}',
+            fontsize=11
+        )
+        axes[idx].axis('off')
+
+    plt.suptitle('Particle Size Distribution Comparison',
+                 fontsize=14, fontweight='bold')
+    plt.tight_layout()
+    plt.savefig('test_distributions.png', dpi=150, bbox_inches='tight')
+    print("\n✓ Results saved: test_distributions.png")
+    plt.show()
+
+
+def test_porosity_range():
+    """Test porosity range analysis"""
+    print("\n" + "=" * 60)
+    print("Test 3: Porosity Range Analysis")
+    print("=" * 60)
+
+    generator = PorousMediaGenerator(img_size=256)
+
+    # Fixed diameter, varying particle count
+    particle_counts = np.linspace(500, 3500, 10, dtype=int)
+    porosities = []
+
+    print("\nFixed diameter=6px, testing different particle counts...")
+    for n in particle_counts:
+        _, porosity = generator.generate(
+            n_particles=int(n),
+            avg_diameter=6,
+            use_gan=False
+        )
+        porosities.append(porosity)
+        print(f"  N={n:4d} → Porosity={porosity:.2%}")
+
+    # Plot relationship curve
+    plt.figure(figsize=(10, 6))
+    plt.plot(particle_counts, np.array(porosities) * 100,
+             marker='o', linewidth=2, markersize=8)
+    plt.xlabel('Number of Particles', fontsize=12)
+    plt.ylabel('Porosity (%)', fontsize=12)
+    plt.title('Porosity vs Particle Count (Fixed Diameter=6px)',
+              fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig('test_porosity_curve.png', dpi=150, bbox_inches='tight')
+    print("\n✓ Results saved: test_porosity_curve.png")
+    plt.show()
+
+
+def main():
+    """Run all tests"""
+    print("\n" + "=" * 60)
+    print("Voronoi-GAN Porous Media Generator - Quick Test")
+    print("=" * 60)
+
+    # Run all tests
+    test_voronoi_generation()
+    test_particle_size_distribution()
+    test_porosity_range()
+
+    print("\n" + "=" * 60)
+    print("✓ All tests completed!")
+    print("=" * 60)
+    print("\nGenerated files:")
+    print("  - test_voronoi_samples.png    (samples with different parameters)")
+    print("  - test_distributions.png      (particle size distribution comparison)")
+    print("  - test_porosity_curve.png     (porosity curve)")
+
+
+if __name__ == "__main__":
+    main()
