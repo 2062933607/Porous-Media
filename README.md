@@ -13,7 +13,7 @@ A sophisticated porous media generation system combining Voronoi tessellation wi
 ## 📋 Requirements
 
 ```bash
-Python >= 3.7
+Python = 3.10
 ```
 
 ### Dependencies
