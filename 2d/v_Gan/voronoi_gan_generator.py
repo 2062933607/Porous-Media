@@ -18,7 +18,6 @@ warnings.filterwarnings('ignore')
 
 # ==================== GAN架构 ====================
 class AttentionBlock(nn.Module):
-    """注意力机制模块"""
 
     def __init__(self, channels):
         super().__init__()
@@ -41,17 +40,11 @@ class AttentionBlock(nn.Module):
 
 
 class Generator(nn.Module):
-    """生成器 - 接收Voronoi特征图并生成精细化的多孔介质"""
 
     def __init__(self, input_channels=2, img_size=256):
-        """
-        Args:
-            input_channels: 输入通道数 (Voronoi基础图 + 噪声通道)
-            img_size: 图像尺寸
-        """
+
         super().__init__()
 
-        # 编码器：提取Voronoi特征
         self.encoder = nn.Sequential(
             nn.Conv2d(input_channels, 64, 3, padding=1),
             nn.LeakyReLU(0.2),
@@ -70,7 +63,6 @@ class Generator(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        # 解码器：生成精细化的多孔介质
         self.decoder = nn.Sequential(
             nn.Upsample(scale_factor=2),
             nn.Conv2d(512, 256, 3, padding=1),
@@ -101,10 +93,8 @@ class Generator(nn.Module):
         if noise is None:
             noise = torch.randn_like(voronoi_img)
 
-        # 拼接Voronoi图和噪声
         x = torch.cat([voronoi_img, noise], dim=1)
 
-        # 编码-解码
         features = self.encoder(x)
         output = self.decoder(features)
 
@@ -112,13 +102,11 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    """判别器 - 区分真实和GAN生成的多孔介质"""
 
     def __init__(self, img_size=256):
         super().__init__()
 
         self.model = nn.Sequential(
-            # 输入: [B, 1, 256, 256]
             nn.Conv2d(1, 64, 3, stride=2, padding=1),
             nn.LeakyReLU(0.2),
             nn.Dropout2d(0.25),
@@ -152,16 +140,13 @@ class Discriminator(nn.Module):
         return validity
 
 
-# ==================== Voronoi颗粒生成器（作为GAN的输入） ====================
 class VoronoiParticleGenerator:
-    """Voronoi颗粒生成器 - 生成基础结构供GAN精细化"""
 
     def __init__(self, img_size=256):
         self.img_size = img_size
 
     def calculate_parameters(self, img_size, target_porosity=0.3,
                              n_particles=None, avg_diameter=None, min_diameter=3):
-        """智能计算生成参数（三选二模式）"""
         total_area = img_size ** 2
 
         params_provided = sum([
@@ -172,7 +157,6 @@ class VoronoiParticleGenerator:
 
         if params_provided < 2:
             raise ValueError(
-                "必须提供以下三个参数中的任意两个：target_porosity, n_particles, avg_diameter"
             )
 
         if target_porosity is not None and n_particles is not None and avg_diameter is None:
@@ -197,7 +181,6 @@ class VoronoiParticleGenerator:
 
     def generate_particle_diameters(self, n_particles, mean_diameter, std_ratio=0.3,
                                     distribution='lognormal'):
-        """生成符合地质统计学规律的颗粒直径分布"""
         if distribution == 'lognormal':
             sigma = std_ratio
             mu = np.log(mean_diameter) - 0.5 * sigma ** 2
@@ -219,14 +202,7 @@ class VoronoiParticleGenerator:
     def create_voronoi_base(self, n_particles=None, target_porosity=0.3,
                             avg_diameter=None, distribution='lognormal',
                             erosion_factor=0.05, min_diameter=3):
-        """
-        创建Voronoi基础图（供GAN精细化）
 
-        返回:
-            base_image: 基础Voronoi图 [0, 1]
-            target_image: 目标真实图（用于训练）[0, 1]
-            actual_porosity: 实际孔隙率
-        """
         n_particles, avg_diameter, target_porosity = self.calculate_parameters(
             self.img_size, target_porosity, n_particles, avg_diameter, min_diameter
         )
@@ -239,10 +215,10 @@ class VoronoiParticleGenerator:
 
         points = np.random.rand(n_particles, 2) * self.img_size
 
-        # 创建基础Voronoi图（粗糙版本，作为GAN输入）
+
         base_image = np.zeros((self.img_size, self.img_size), dtype=np.float32)
 
-        # 创建目标图像（精细版本，作为训练目标）
+
         target_image = np.zeros((self.img_size, self.img_size), dtype=np.float32)
 
         for point, diameter in zip(points, diameters):
@@ -251,18 +227,14 @@ class VoronoiParticleGenerator:
             center_x, center_y = point[0], point[1]
             dist_from_center = np.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
 
-            # 基础版本：简单的圆形，无侵蚀
             base_mask = dist_from_center < radius
             base_image[base_mask] = 1
 
-            # 目标版本：带侵蚀和细节
             target_mask = dist_from_center < radius * (1 - erosion_factor)
             target_image[target_mask] = 1
 
-        # 基础图：轻微模糊
         base_image = gaussian_filter(base_image.astype(float), sigma=0.3)
 
-        # 目标图：细节保留
         target_image = gaussian_filter(target_image.astype(float), sigma=0.5)
 
         actual_porosity = (target_image < 0.5).sum() / target_image.size
@@ -270,16 +242,11 @@ class VoronoiParticleGenerator:
         return base_image, target_image, actual_porosity
 
 
-# ==================== 数据集类 ====================
 class VoronoiGANDataset(Dataset):
     """Voronoi-GAN配对数据集"""
 
     def __init__(self, base_images, target_images):
-        """
-        Args:
-            base_images: Voronoi基础图列表
-            target_images: 目标精细图列表
-        """
+
         self.base_images = base_images
         self.target_images = target_images
 
@@ -301,9 +268,7 @@ class VoronoiGANDataset(Dataset):
         return base_tensor, target_tensor
 
 
-# ==================== GAN训练器（Voronoi-GAN） ====================
 class VoronoiGANTrainer:
-    """Voronoi-GAN训练器：将粗糙Voronoi图精细化"""
 
     def __init__(self, img_size=256, device=None):
         self.img_size = img_size
@@ -327,16 +292,7 @@ class VoronoiGANTrainer:
         self.l1_losses = []
 
     def train(self, dataloader, epochs=100, lambda_l1=100, save_interval=10, save_dir='voronoi_gan_checkpoints'):
-        """
-        训练Voronoi-GAN
 
-        Args:
-            dataloader: 数据加载器 (base_image, target_image)
-            epochs: 训练轮数
-            lambda_l1: L1损失权重
-            save_interval: 保存间隔
-            save_dir: 保存目录
-        """
         os.makedirs(save_dir, exist_ok=True)
 
         print(f"开始训练Voronoi-GAN on {self.device}")
@@ -539,19 +495,7 @@ class PorousMediaGenerator:
 
     def generate_training_data(self, n_samples=1000, particle_range=(500, 4000),
                                diameter_range=(4, 10)):
-        """
-        生成训练数据：Voronoi基础图 + 目标图
-        使用模式3：指定颗粒数 + 平均直径 → 自动计算孔隙率
 
-        Args:
-            n_samples: 生成样本数量
-            particle_range: 颗粒数范围 (min, max)
-            diameter_range: 平均直径范围 (min, max) 单位：像素
-
-        Returns:
-            base_images: Voronoi基础图列表
-            target_images: 目标精细图列表
-        """
         print(f"正在生成 {n_samples} 个训练样本（模式3: 颗粒数+直径 → 孔隙率）...")
         print(f"  颗粒数范围: {particle_range[0]}-{particle_range[1]}")
         print(f"  直径范围: {diameter_range[0]}-{diameter_range[1]} 像素")
@@ -619,21 +563,7 @@ class PorousMediaGenerator:
 
     def generate(self, n_particles=None, porosity=None, avg_diameter=None,
                  use_gan=True, distribution='lognormal', erosion_factor=0.05):
-        """
-        生成多孔介质图像
 
-        Args:
-            n_particles: 颗粒数量（三选二）
-            porosity: 孔隙率（三选二）
-            avg_diameter: 平均直径（三选二）
-            use_gan: 是否使用GAN精细化
-            distribution: 粒径分布类型
-            erosion_factor: 侵蚀因子
-
-        Returns:
-            如果use_gan=False: 返回(Voronoi目标图, 实际孔隙率)
-            如果use_gan=True: 返回(Voronoi基础图, GAN精细化图, 实际孔隙率)
-        """
         # 生成Voronoi基础图和目标图
         base_img, target_img, actual_porosity = self.voronoi_gen.create_voronoi_base(
             n_particles=n_particles,
@@ -691,7 +621,7 @@ def visualize_comparison(base_img, gan_img, porosity):
     return fig
 
 
-def demo_training():
+def v_g_training():
     """演示Voronoi-GAN训练流程"""
     print("\n" + "=" * 80)
     print("Voronoi-GAN 训练演示（模式3: 颗粒数+直径 → 孔隙率）")
@@ -712,7 +642,7 @@ def demo_training():
         lambda_l1=100,  # L1损失权重，控制结构保持
         particle_range=(800, 3000),  # 颗粒数范围
         diameter_range=(4, 10),  # 直径范围
-        save_dir='voronoi_gan_demo'
+        save_dir='voronoi_gan_v_g'
     )
 
     # 使用GAN生成
@@ -748,7 +678,7 @@ def demo_training():
     plt.show()
 
 
-def demo_comparison():
+def v_g_comparison():
     """对比Voronoi原始图与GAN精细化后的效果"""
     print("\n" + "=" * 80)
     print("Voronoi vs Voronoi-GAN 对比（模式3: 颗粒数+直径）")
@@ -794,7 +724,7 @@ def demo_comparison():
         plt.show()
 
 
-def demo_quick_test():
+def v_g_quick_test():
     """快速测试：使用模式3生成不同颗粒数和直径的样本"""
     print("\n" + "=" * 80)
     print("快速测试：模式3（颗粒数+直径 → 孔隙率）")
@@ -892,7 +822,7 @@ if __name__ == "__main__":
 
     # 默认运行快速测试
     print("\n>>> 运行模式1: 快速测试（模式3）")
-    demo_quick_test()
+    v_g_quick_test()
 
     print("\n" + "=" * 80)
     print("演示完成!")
@@ -902,12 +832,12 @@ if __name__ == "__main__":
     print("  - 直径越大 → 孔隙率越小（颗粒更大）")
     print("  - 系统自动计算最终孔隙率")
     print("\n如需训练GAN并查看精细化效果，请取消注释:")
-    print("# demo_training()")
+    print("# v_g_training()")
     print("\n如需对比Voronoi和GAN效果，请取消注释:")
-    print("# demo_comparison()")
+    print("# v_g_comparison()")
 
     # 取消下面的注释来运行完整GAN训练
-    demo_training()
+    v_g_training()
 
     # 取消下面的注释来运行对比测试
-    demo_comparison()
+    v_g_comparison()
